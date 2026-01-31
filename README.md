@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="FIRST logo" width="240">
+</p>
+
 # FIRST
 
 > FIRST is a deterministic crash and recovery testing framework for storage engines and WAL-based systems.
@@ -164,71 +168,3 @@ test(|env| {
 
     db.assert_invariants();
 });
-
-## Project Status
-
-FIRST is in an early stage of development.
-
-The current focus is on:
-- Defining a clear and minimal core model
-- Establishing deterministic crash and recovery semantics
-- Validating the design through small, targeted examples
-
-The API is intentionally unstable and subject to change.
-
-This early phase prioritizes:
-- Correctness over completeness
-- Clarity over feature count
-- Design rigor over rapid expansion
-
-Feedback from storage and database engineers is welcome, particularly around:
-- Invariant modeling
-- Crash boundaries
-- Recovery semantics
-
-## Roadmap
-
-FIRST is being developed in deliberate phases.
-
-### Phase 1 — Core crash testing (current focus)
-
-- Deterministic crash scheduler
-- Explicit crash points
-- Process termination and restart
-- Persistent state inspection
-- Minimal example storage systems
-
-### Phase 2 — Reusable test harness
-
-- Ergonomic test API
-- Clear separation between test logic and storage logic
-- Invariant definition helpers
-- Improved diagnostics for failure reproduction
-
-### Phase 3 — Language bindings
-
-- Rust (native)
-- C / C++
-- Go
-- Java
-
-The roadmap is intentionally conservative.
-
-Features are added only when they preserve determinism, reproducibility, and clarity.
-
-## Contributing
-
-FIRST is an early-stage project focused on correctness, determinism, and clear design.
-
-Contributions are welcome, especially in the form of:
-- Design feedback
-- Invariant modeling ideas
-- Small, focused examples
-- Documentation improvements
-
-Before contributing code, please open an issue to discuss the approach.
-
-This helps keep the core design coherent and avoids premature complexity.
-
-See `CONTRIBUTING.md` for details.
-
