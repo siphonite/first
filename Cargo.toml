@@ -2,5 +2,14 @@
 name = "first"
 version = "0.1.0"
 edition = "2024"
+description = "Deterministic crash testing framework for storage engines"
+license = "MIT"
+repository = "https://github.com/siphonite/first"
+keywords = ["crash-testing", "storage", "database", "testing", "fault-injection"]
+categories = ["development-tools::testing"]
 
 [dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,14 +1,21 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! FIRST: Deterministic crash testing framework for storage engines.
+//!
+//! This crate provides primitives for injecting crashes at specific points
+//! in your storage system's execution to verify crash consistency.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use first::crash_point;
+//!
+//! fn my_storage_operation() {
+//!     write_to_wal();
+//!     crash_point("after_wal_write");
+//!     fsync_wal();
+//!     crash_point("after_wal_sync");
+//! }
+//! ```
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod rt;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use rt::crash_point;
