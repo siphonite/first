@@ -21,7 +21,7 @@ const ENV_SEED: &str = "FIRST_SEED";
 
 /// Execution phase of the current process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Phase {
+pub(crate) enum Phase {
     /// Orchestrator: manages test lifecycle, does not run workload directly.
     Orchestrator,
     /// Execution: runs workload, may crash at target point.
@@ -32,8 +32,8 @@ enum Phase {
 
 /// Cached runtime configuration.
 #[derive(Debug)]
-struct RuntimeConfig {
-    phase: Phase,
+pub(crate) struct RuntimeConfig {
+    pub(crate) phase: Phase,
     /// Target crash point (1-indexed per design doc).
     /// `usize::MAX` means "never crash".
     target_crash_point: usize,
@@ -66,7 +66,7 @@ fn init_runtime() -> RuntimeConfig {
 /// Returns the cached runtime configuration.
 /// Environment variables are read exactly once per process.
 #[inline]
-fn runtime() -> &'static RuntimeConfig {
+pub(crate) fn runtime() -> &'static RuntimeConfig {
     RUNTIME.get_or_init(init_runtime)
 }
 
