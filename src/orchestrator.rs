@@ -80,18 +80,22 @@ where
                         }
                     }
                     ChildResult::Failed(code) => {
-                        eprintln!(
-                            "[first] crash point {}: FAILED (see {})",
+                        print_failure_info(
                             target,
-                            work_dir.display()
+                            &work_dir,
+                            &crash_info,
+                            &test_name,
+                            &format!("verification failed with exit code {}", code),
                         );
-                        eprintln!("[first] verification failed with exit code {}", code);
                         std::process::exit(1);
                     }
                     ChildResult::Crashed(_) => {
-                        eprintln!(
-                            "[first] crash point {}: FAILED (verify phase crashed unexpectedly)",
-                            target
+                        print_failure_info(
+                            target,
+                            &work_dir,
+                            &crash_info,
+                            &test_name,
+                            "verify phase crashed unexpectedly",
                         );
                         std::process::exit(1);
                     }
@@ -106,8 +110,17 @@ where
             }
             ChildResult::Failed(code) => {
                 eprintln!(
-                    "[first] crash point {}: FAILED (execution failed with exit code {})",
-                    target, code
+                    "[first] crash point {}: FAILED (see {})",
+                    target,
+                    work_dir.display()
+                );
+                eprintln!("[first] execution failed with exit code {}", code);
+                eprintln!("[first] to reproduce:");
+                eprintln!(
+                    "  FIRST_PHASE=EXECUTION FIRST_CRASH_TARGET={} FIRST_WORK_DIR={} cargo test{} -- --exact",
+                    target,
+                    work_dir.display(),
+                    test_name.as_ref().map(|n| format!(" {}", n)).unwrap_or_default()
                 );
                 std::process::exit(1);
             }
@@ -115,6 +128,32 @@ where
 
         target += 1;
     }
+}
+
+/// Print detailed failure information for debugging.
+fn print_failure_info(
+    target: usize,
+    work_dir: &PathBuf,
+    crash_info: &CrashInfo,
+    test_name: &Option<String>,
+    reason: &str,
+) {
+    eprintln!(
+        "[first] crash point {}: FAILED (see {})",
+        target,
+        work_dir.display()
+    );
+    eprintln!("[first] crash label: \"{}\"", crash_info.label);
+    eprintln!("[first] reason: {}", reason);
+    eprintln!("[first] to reproduce:");
+    eprintln!(
+        "  FIRST_PHASE=VERIFY FIRST_CRASH_TARGET={} FIRST_WORK_DIR={} FIRST_CRASH_POINT_ID={} FIRST_CRASH_LABEL=\"{}\" cargo test{} -- --exact",
+        target,
+        work_dir.display(),
+        crash_info.point_id,
+        crash_info.label,
+        test_name.as_ref().map(|n| format!(" {}", n)).unwrap_or_default()
+    );
 }
 
 /// Result of a child process execution.
