@@ -146,41 +146,12 @@ impl Wal {
 
     /// Commit a transaction.
     pub fn commit(&mut self, txid: TxId) {
-        let wal_path = self.dir.join("wal.log");
-        let tmp_path = self.dir.join("wal.log.tmp");
-
-        // Write commit record to current file
         writeln!(self.file, "COMMIT {}", txid).expect("failed to write COMMIT");
         crash_point("after_commit_write");
         self.file.sync_all().expect("failed to fsync after COMMIT");
         crash_point("after_wal_fsync");
 
-        // Copy current WAL to temp file for atomic publish
-        drop(std::mem::replace(
-            &mut self.file,
-            File::create(&tmp_path).expect("failed to create temp file"),
-        ));
-
-        // Re-open and copy the original WAL content to temp
-        let content = fs::read(&wal_path).expect("failed to read WAL");
-        fs::write(&tmp_path, &content).expect("failed to write temp file");
-
-        // Sync the temp file
-        let tmp_file = File::open(&tmp_path).expect("failed to open temp file");
-        tmp_file.sync_all().expect("failed to fsync temp file");
-        drop(tmp_file);
-
-        // Atomic rename
-        fs::rename(&tmp_path, &wal_path).expect("failed to rename temp file");
-        crash_point("after_rename");
-
-        // Re-open the WAL file in append mode
-        self.file = OpenOptions::new()
-            .append(true)
-            .open(&wal_path)
-            .expect("failed to reopen WAL");
-
-        // Re-read the WAL to update in-memory state
+        let wal_path = self.dir.join("wal.log");
         let (state, _) = Self::recover_from_file(&wal_path).expect("failed to recover after commit");
         self.state = state;
     }
