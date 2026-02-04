@@ -146,6 +146,7 @@ impl Wal {
 
     /// Commit a transaction.
     pub fn commit(&mut self, txid: TxId) {
+        self.file.sync_all().expect("failed to fsync records");
         writeln!(self.file, "COMMIT {}", txid).expect("failed to write COMMIT");
         crash_point("after_commit_write");
         self.file.sync_all().expect("failed to fsync after COMMIT");
