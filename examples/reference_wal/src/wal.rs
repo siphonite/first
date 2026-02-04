@@ -5,6 +5,8 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
+use first::crash_point;
+
 /// Transaction identifier.
 pub type TxId = u64;
 
@@ -129,7 +131,9 @@ impl Wal {
         self.next_txid += 1;
 
         writeln!(self.file, "BEGIN {}", txid).expect("failed to write BEGIN");
+        crash_point("after_begin_write");
         self.file.sync_all().expect("failed to fsync after BEGIN");
+        crash_point("after_wal_fsync");
 
         txid
     }
@@ -137,13 +141,15 @@ impl Wal {
     /// Write a key-value pair within a transaction.
     pub fn put(&mut self, txid: TxId, key: &str, value: &str) {
         writeln!(self.file, "PUT {} {} {}", txid, key, value).expect("failed to write PUT");
-        // No fsync here - buffered until commit
+        crash_point("after_record_write");
     }
 
     /// Commit a transaction.
     pub fn commit(&mut self, txid: TxId) {
         writeln!(self.file, "COMMIT {}", txid).expect("failed to write COMMIT");
+        crash_point("after_commit_write");
         self.file.sync_all().expect("failed to fsync after COMMIT");
+        crash_point("after_wal_fsync");
 
         // Re-read the WAL to update in-memory state
         // (Simple approach: re-recover the entire file)

@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+first = { path = "../.." }
 
 [dev-dependencies]
 tempfile = "3"
