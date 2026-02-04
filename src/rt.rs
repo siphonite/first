@@ -3,8 +3,8 @@
 //! This module contains the core primitives for crash injection.
 
 use std::io::Write;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Global counter tracking the number of crash points encountered.
 /// Starts at 0, incremented to 1 on first crash_point, etc.
@@ -182,7 +182,6 @@ mod tests {
         crash_point("test_point_1");
         crash_point("test_point_2");
         // If we reach here, crash_point correctly did nothing
-        assert!(true);
     }
 
     #[test]

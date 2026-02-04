@@ -4,7 +4,7 @@
 
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
 use crate::env::{CrashInfo, Env};
@@ -52,24 +52,13 @@ where
         }
 
         // Spawn EXECUTION phase
-        let exec_result = spawn_child(
-            &exe,
-            &test_name,
-            "EXECUTION",
-            target,
-            &work_dir,
-        );
+        let exec_result = spawn_child(&exe, &test_name, "EXECUTION", target, &work_dir);
 
         match exec_result {
             ChildResult::Crashed(crash_info) => {
                 // Child crashed as expected, now verify
-                let verify_result = spawn_child_with_crash_info(
-                    &exe,
-                    &test_name,
-                    target,
-                    &work_dir,
-                    &crash_info,
-                );
+                let verify_result =
+                    spawn_child_with_crash_info(&exe, &test_name, target, &work_dir, &crash_info);
 
                 match verify_result {
                     ChildResult::Success => {
@@ -120,7 +109,10 @@ where
                     "  FIRST_PHASE=EXECUTION FIRST_CRASH_TARGET={} FIRST_WORK_DIR={} cargo test{} -- --exact",
                     target,
                     work_dir.display(),
-                    test_name.as_ref().map(|n| format!(" {}", n)).unwrap_or_default()
+                    test_name
+                        .as_ref()
+                        .map(|n| format!(" {}", n))
+                        .unwrap_or_default()
                 );
                 std::process::exit(1);
             }
@@ -133,7 +125,7 @@ where
 /// Print detailed failure information for debugging.
 fn print_failure_info(
     target: usize,
-    work_dir: &PathBuf,
+    work_dir: &Path,
     crash_info: &CrashInfo,
     test_name: &Option<String>,
     reason: &str,
@@ -152,7 +144,10 @@ fn print_failure_info(
         work_dir.display(),
         crash_info.point_id,
         crash_info.label,
-        test_name.as_ref().map(|n| format!(" {}", n)).unwrap_or_default()
+        test_name
+            .as_ref()
+            .map(|n| format!(" {}", n))
+            .unwrap_or_default()
     );
 }
 
@@ -168,11 +163,11 @@ enum ChildResult {
 
 /// Spawn a child process in the given phase.
 fn spawn_child(
-    exe: &PathBuf,
+    exe: &Path,
     test_name: &Option<String>,
     phase: &str,
     target: usize,
-    work_dir: &PathBuf,
+    work_dir: &Path,
 ) -> ChildResult {
     let mut cmd = Command::new(exe);
 
@@ -202,7 +197,7 @@ fn spawn_child(
 
     // Read stderr for crash metadata
     let stderr = child.stderr.take();
-    let crash_info = stderr.and_then(|s| parse_crash_metadata(s));
+    let crash_info = stderr.and_then(parse_crash_metadata);
 
     // Wait for child to exit
     let status = match child.wait() {
@@ -218,10 +213,10 @@ fn spawn_child(
 
 /// Spawn a child process in VERIFY phase with crash info.
 fn spawn_child_with_crash_info(
-    exe: &PathBuf,
+    exe: &Path,
     test_name: &Option<String>,
     target: usize,
-    work_dir: &PathBuf,
+    work_dir: &Path,
     crash_info: &CrashInfo,
 ) -> ChildResult {
     let mut cmd = Command::new(exe);
@@ -282,13 +277,11 @@ fn parse_crash_metadata(stderr: impl std::io::Read) -> Option<CrashInfo> {
 /// Simple JSON parser for crash metadata.
 fn parse_crash_json(json: &str) -> Option<CrashInfo> {
     // Format: {"event":"crash","point_id":N,"label":"...","seed":...,"work_dir":"..."}
-    let point_id = json
-        .find(r#""point_id":"#)
-        .and_then(|i| {
-            let start = i + 11;
-            let end = json[start..].find(',')?;
-            json[start..start + end].parse().ok()
-        })?;
+    let point_id = json.find(r#""point_id":"#).and_then(|i| {
+        let start = i + 11;
+        let end = json[start..].find(',')?;
+        json[start..start + end].parse().ok()
+    })?;
 
     let label = json
         .find(r#""label":""#)
@@ -320,11 +313,11 @@ fn interpret_exit_status(status: ExitStatus, crash_info: Option<CrashInfo>) -> C
     #[cfg(unix)]
     {
         use std::os::unix::process::ExitStatusExt;
-        if let Some(signal) = status.signal() {
-            if signal == libc::SIGKILL {
-                let info = crash_info.unwrap_or_else(|| CrashInfo::new(0, "unknown".to_string()));
-                return ChildResult::Crashed(info);
-            }
+        if let Some(signal) = status.signal()
+            && signal == libc::SIGKILL
+        {
+            let info = crash_info.unwrap_or_else(|| CrashInfo::new(0, "unknown".to_string()));
+            return ChildResult::Crashed(info);
         }
     }
 
