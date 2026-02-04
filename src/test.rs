@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use crate::env::{CrashInfo, Env};
-use crate::rt::{runtime, Phase};
+use crate::rt::{Phase, runtime};
 
 /// Builder for FIRST tests.
 ///
@@ -33,6 +33,7 @@ where
 ///     })
 ///     .execute();
 /// ```
+#[allow(clippy::type_complexity)]
 pub fn test() -> TestBuilder<fn(&Env), fn(&Env, &CrashInfo)> {
     TestBuilder {
         run_fn: None,

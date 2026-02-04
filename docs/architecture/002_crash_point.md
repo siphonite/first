@@ -1,10 +1,5 @@
 # Architecture Decision: `crash_point()` Semantics
 
-**Status:** Proposed  
-**Issue:** #2
-
----
-
 ## 1. Overview
 
 `first::crash_point()` is the core primitive for explicit crash injection. This document defines its exact behavior for v0.1.
