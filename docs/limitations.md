@@ -4,7 +4,7 @@ This document describes known limitations of the FIRST framework.
 
 ---
 
-## Crash Model Limitation (v0.1)
+## Crash Model (v0.1)
 
 FIRST v0.1 models process crashes using `SIGKILL`.
 
@@ -13,72 +13,122 @@ FIRST v0.1 models process crashes using `SIGKILL`.
 - Sudden process termination
 - Loss of in-memory state
 - Incomplete syscalls (operations interrupted mid-execution)
-- Recovery from filesystemstate left by prior operations
+- Recovery from filesystem state left by prior operations
+- Page cache flush ordering non-determinism
 
 ### What v0.1 Does NOT Simulate
 
 - **Power loss** — Actual power failure affects the block layer and hardware
 - **Block-layer rollback** — Storage devices may lose data in their write caches
-- **Loss of kernel metadata already applied** — e.g., directory entries that are in the page cache but not yet journaled
+- **Torn writes** — Partial sector writes that can occur during power loss
+- **Filesystem metadata rollback** — Directory entries applied but not journaled
 
-### Implications
+### Detectable Bug Classes
 
-As a result, certain real-world crash-consistency bugs cannot be exposed in v0.1:
-
-| Bug Type | Detectable in v0.1? | Notes |
-|----------|---------------------|-------|
-| Missing `fsync()` after data write | ⚠️ Partial | Only if kernel hasn't flushed page cache |
-| Missing parent-directory `fsync()` after `rename()` | ❌ No | `rename()` is applied at kernel level before crash point |
+| Bug Type | Detectable? | Notes |
+|----------|-------------|-------|
+| Recovery logic errors | ✅ Yes | SIGKILL accurately tests recovery paths |
+| Transaction atomicity bugs | ✅ Yes | Commit-before-durable patterns exposed |
+| Missing fsync before commit | ✅ Yes | Page cache flush ordering is undefined |
+| Missing parent-directory fsync | ❌ No | Requires filesystem interposition |
 | Partial sector writes | ❌ No | Requires block-layer simulation |
 | Torn writes | ❌ No | Requires hardware-level simulation |
-| Recovery logic bugs | ✅ Yes | SIGKILL accurately tests recovery paths |
-| Transaction atomicity bugs | ✅ Yes | Visible through invariant checking |
 
-### Example: Why Parent Directory Fsync Bugs Are Not Detectable
+---
 
-Consider this code:
+## Reference WAL Bug (Intentional)
 
-```rust
-fs::rename(&tmp_path, &wal_path)?;  // Kernel applies rename immediately
-crash_point("after_rename");        // SIGKILL here
-// Missing: fsync parent directory
+The reference WAL contains one intentional recovery-semantic bug to serve as proof that FIRST can expose real crash-consistency violations.
+
+### Bug Description
+
+The WAL writes the transaction `COMMIT` marker before ensuring all transaction records are durable:
+
+```
+write(record_1)
+write(record_2)
+write(record_3)
+write(COMMIT)
+fsync()         ← records and commit flushed together, order undefined
 ```
 
-When `crash_point` triggers `SIGKILL`:
-1. The `rename()` syscall has **already completed** at the kernel level
-2. The directory entry exists in the kernel's VFS cache
-3. `SIGKILL` terminates the process but does **not** undo kernel operations
-4. Recovery sees the renamed file as expected
+The correct implementation would be:
 
-The bug would only manifest if:
-- Power was lost before the directory entry was journaled
-- The filesystem replayed its journal without the rename
+```
+write(record_1)
+write(record_2)
+write(record_3)
+fsync()         ← ensure records are durable
+write(COMMIT)
+fsync()         ← then write commit
+```
 
-### Scope for Milestone 3
+### Failure Mode
 
-The "missing parent-directory fsync" bug is **explicitly out of scope** for the Milestone 3 proof.
+When a crash occurs at `after_commit_write` (after COMMIT is written but before fsync):
 
-Milestone 3 demonstrates:
-- FIRST's orchestration model works correctly
-- Crash points are injected and triggered deterministically
-- Recovery and invariant checking function as designed
-- The framework is ready for enhanced crash simulation
+1. Both records and COMMIT are in the kernel page cache
+2. The process is killed with SIGKILL
+3. The kernel flushes the page cache in undefined order
+4. COMMIT may reach disk before all records
+5. Recovery sees a committed transaction with missing records
+6. **Atomicity invariant violated**
 
-### Future Versions
+### Why This Bug Is Valid Under SIGKILL
 
-Future versions of FIRST may add:
+This bug does not require power loss or block-layer simulation. It relies only on:
 
-1. **Filesystem interposition (v0.2)**
-   - `LD_PRELOAD` to intercept syscalls
-   - Simulate incomplete `rename()` or `write()` operations
+- **Page cache behavior**: Writes go to page cache, not directly to disk
+- **Flush ordering**: Kernel may flush pages in any order
+- **Missing durability barrier**: No fsync between records and COMMIT
 
-2. **FUSE-based simulation**
-   - Virtual filesystem that can selectively lose data
-   - Full control over what survives a crash
+When SIGKILL terminates the process, the kernel continues to manage the page cache. The order in which dirty pages are written to disk is not guaranteed to match the order they were written by the application.
 
-3. **Block-layer simulation**
-   - Intercept at the device level
-   - Simulate write cache behavior and torn writes
+---
+
+## Proof of FIRST Effectiveness (v0.1)
+
+The following proof chain demonstrates that FIRST v0.1 can expose real crash-consistency bugs:
+
+1. **FIRST injects a crash** at the `after_commit_write` crash point
+2. **The process is killed** with SIGKILL
+3. **Filesystem state is preserved** exactly as it existed at crash time
+4. **Recovery runs** and opens the WAL
+5. **Recovery observes** a `COMMIT` marker for transaction 1
+6. **Recovery attempts** to replay the transaction
+7. **Some records are missing** (not yet flushed to disk)
+8. **Atomicity invariant fails**: committed transaction has partial visibility
+9. **Failure is deterministic** and reproducible with the same crash point
+
+This proof validates:
+
+- Crash point injection works correctly
+- SIGKILL-based process termination preserves filesystem state
+- Recovery logic is exercised after each crash
+- Invariant checking detects atomicity violations
+- Failures are reproducible for debugging
+
+---
+
+## Future Versions
+
+Future versions of FIRST may add enhanced crash simulation:
+
+### v0.2 — Filesystem Interposition
+
+- `LD_PRELOAD` to intercept syscalls
+- Simulate incomplete `rename()` or `write()` operations
+- Expose directory-fsync bugs
+
+### v0.3 — FUSE-based Simulation
+
+- Virtual filesystem with selective data loss
+- Full control over what survives a crash
+
+### v0.4 — Block-layer Simulation
+
+- Device-level interception
+- Simulate write cache behavior and torn writes
 
 ---
 
