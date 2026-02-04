@@ -38,7 +38,7 @@ FIRST v0.1 models process crashes using `SIGKILL`.
 
 ## Reference WAL Bug (Intentional)
 
-The reference WAL contains one intentional recovery-semantic bug to serve as proof that FIRST can expose real crash-consistency violations.
+The reference WAL contained one intentional recovery-semantic bug, which was introduced and fixed as part of the Milestone 3 proof. This demonstrates that FIRST can expose real crash-consistency violations.
 
 ### Bug Description
 

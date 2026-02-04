@@ -114,7 +114,7 @@ After the fix, FIRST reports all crash points passed:
 
 ## How to Reproduce the Original Bug
 
-1. Check out the pre-fix commit (before Issue #9 fix)
+1. Check out the commit immediately before the fix (see `Fixes #9` in git history)
 2. Run the crash consistency test:
 
 ```bash
