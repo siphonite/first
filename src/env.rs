@@ -32,13 +32,6 @@ impl Env {
     pub fn path(&self, name: &str) -> PathBuf {
         self.work_dir.join(name)
     }
-
-    /// Returns the root of the isolated working directory.
-    ///
-    /// This is internal-only. Users should use [`Env::path()`] instead.
-    pub(crate) fn root(&self) -> &PathBuf {
-        &self.work_dir
-    }
 }
 
 /// Information about a crash that occurred.
