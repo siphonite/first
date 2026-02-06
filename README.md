@@ -138,7 +138,7 @@ fn test_log_atomicity() {
     first::test()
         // Define the workload
         .run(|env| {
-            let log = AppendLog::create(env.path().join("test.log"));
+            let log = AppendLog::create(env.path("test.log"));
             
             log.append("entry1").expect("append failed");
             // Implicit crash point: after write() syscall
@@ -161,7 +161,7 @@ fn test_log_atomicity() {
             println!("Recovering from crash at: {:?}", crash_info);
             
             // Recovery: reopen the log (triggers internal recovery logic)
-            let log = AppendLog::open(env.path().join("test.log"))
+            let log = AppendLog::open(env.path("test.log"))
                 .expect("log should always be recoverable");
             
             let entries = log.read_all();
