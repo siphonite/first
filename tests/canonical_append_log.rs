@@ -36,18 +36,29 @@ fn append_log_atomicity() {
 
             let records: Vec<_> = contents.lines().collect();
 
-            // INVARIANT: Records are prefix-consistent
-            // Either: [], ["RECORD1"], or ["RECORD1", "RECORD2"]
-            // Never: ["RECORD2"] alone (would violate append-only semantics)
+            // INVARIANT: Records are prefix-consistent, with durability enforcement
+            //
+            // Before fsync: any prefix is acceptable ([], ["RECORD1"], or both)
+            // After fsync: both records MUST be present (fsync guarantees durability)
 
-            match records.as_slice() {
-                [] => { /* Nothing persisted - fine */ }
-                ["RECORD1"] => { /* Partial - fine */ }
-                ["RECORD1", "RECORD2"] => { /* Complete - fine */ }
-                other => {
+            match (crash_info.label.as_str(), records.as_slice()) {
+                // After write_1: nothing or RECORD1 is fine
+                ("after_write_1", []) => {}
+                ("after_write_1", ["RECORD1"]) => {}
+
+                // After write_2: nothing, RECORD1, or both is fine (not yet synced)
+                ("after_write_2", []) => {}
+                ("after_write_2", ["RECORD1"]) => {}
+                ("after_write_2", ["RECORD1", "RECORD2"]) => {}
+
+                // After fsync: MUST have both records (durability guarantee)
+                ("after_fsync", ["RECORD1", "RECORD2"]) => {}
+
+                // Any other state is a violation
+                (label, state) => {
                     panic!(
                         "Invariant violation at '{}': unexpected log state {:?}",
-                        crash_info.label, other
+                        label, state
                     );
                 }
             }
