@@ -22,10 +22,16 @@ impl Env {
     ///
     /// The returned path is guaranteed to:
     /// - Be within a directory created by FIRST
-    /// - Exist on disk before `run()` is executed
+    /// - Have its parent workspace directory exist before `run()` is executed
     /// - Be reset for each crash-restart iteration
     ///
     /// This function performs no I/O beyond path construction.
+    /// The caller is responsible for creating any subdirectories or files.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `name` is an absolute path. Only relative paths are allowed
+    /// to ensure isolation within the workspace.
     ///
     /// # Example
     ///
@@ -34,6 +40,12 @@ impl Env {
     /// std::fs::create_dir_all(&db_path).unwrap();
     /// ```
     pub fn path(&self, name: impl AsRef<Path>) -> PathBuf {
+        let name = name.as_ref();
+        assert!(
+            !name.is_absolute(),
+            "Env::path() requires a relative path, got absolute: {:?}",
+            name
+        );
         self.work_dir.join(name)
     }
 }
