@@ -2,11 +2,12 @@
 //!
 //! Provides context to test closures.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Environment provided to test closures.
 ///
 /// Contains the isolated working directory for this test run.
+/// This type is opaque; users interact with it only through [`Env::path()`].
 pub struct Env {
     work_dir: PathBuf,
 }
@@ -17,19 +18,22 @@ impl Env {
         Self { work_dir }
     }
 
-    /// Returns a path within the isolated working directory.
+    /// Returns an absolute path inside this test's isolated workspace.
     ///
-    /// # Arguments
+    /// The returned path is guaranteed to:
+    /// - Be within a directory created by FIRST
+    /// - Exist on disk before `run()` is executed
+    /// - Be reset for each crash-restart iteration
     ///
-    /// * `name` - Relative path within the work directory.
+    /// This function performs no I/O beyond path construction.
     ///
     /// # Example
     ///
     /// ```ignore
-    /// let file_path = env.path("data/file.txt");
-    /// std::fs::write(&file_path, "hello").unwrap();
+    /// let db_path = env.path("mydb");
+    /// std::fs::create_dir_all(&db_path).unwrap();
     /// ```
-    pub fn path(&self, name: &str) -> PathBuf {
+    pub fn path(&self, name: impl AsRef<Path>) -> PathBuf {
         self.work_dir.join(name)
     }
 }

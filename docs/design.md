@@ -388,7 +388,7 @@ fn test_append_log() {
     first::test()
         // Define the workload to execute
         .run(|env| {
-            let log = AppendLog::create(env.path().join("mylog"));
+            let log = AppendLog::create(env.path("mylog"));
             
             // Crash Point 0: After file creation (implicit)
             
@@ -413,7 +413,7 @@ fn test_append_log() {
             println!("Recovering from crash at: {:?}", crash_info);
             
             // System restarts against the FS state from crash moment
-            let log = AppendLog::open(env.path().join("mylog"))
+            let log = AppendLog::open(env.path("mylog"))
                 .expect("log should always be openable");
             
             // Define invariants that MUST hold
@@ -461,7 +461,7 @@ first::test()
 
 **Environment API:**
 ```rust
-env.path()                    // Base directory for persistent state
+env.path("dir")               // Path inside workspace for persistent state
 env.crash_point_count()       // Number of crash points discovered
 ```
 
@@ -484,7 +484,7 @@ crash_info.operation          // Which syscall was interrupted (if any)
 fn test_wal_atomicity() {
     first::test()
         .run(|env| {
-            let wal = WAL::create(env.path());
+            let wal = WAL::create(env.path("wal"));
             
             // Begin transaction
             let tx = wal.begin_tx();
@@ -499,7 +499,7 @@ fn test_wal_atomicity() {
             first::crash_point("after_commit");
         })
         .verify(|env, _| {
-            let wal = WAL::open(env.path());
+            let wal = WAL::open(env.path("wal"));
             let entries = wal.replay();
             
             // Invariant: Transaction is atomic
@@ -515,7 +515,7 @@ fn test_wal_atomicity() {
 fn test_manifest_update() {
     first::test()
         .run(|env| {
-            let db = Database::create(env.path());
+            let db = Database::create(env.path("db"));
             
             // Generate SSTable file
             let sst = db.flush_memtable();
@@ -528,7 +528,7 @@ fn test_manifest_update() {
             first::crash_point("manifest_updated");
         })
         .verify(|env, _| {
-            let db = Database::open(env.path());
+            let db = Database::open(env.path("db"));
             
             // Invariant: No orphaned SSTable files
             let referenced = db.manifest_list_sstables();
@@ -1667,7 +1667,7 @@ first::test()
 ### A.2 Environment API
 
 ```rust
-env.path()                // Base directory for persistent state
+env.path(\"name\")             // Path inside workspace for persistent state
 env.crash_point_count()   // Number of discovered crash points
 ```
 
