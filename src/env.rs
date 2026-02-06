@@ -52,12 +52,53 @@ impl Env {
 
 /// Information about a crash that occurred.
 ///
-/// Provided to the verify closure after a crash.
+/// Provided to the verify closure after each crash-restart cycle.
+/// Use this to understand which crash point triggered the current
+/// verification run.
+///
+/// # Stability guarantees
+///
+/// - `point_id` is stable for a given test and crash schedule
+/// - `label` is exactly the string passed to `crash_point()`
+///
+/// # Non-guarantees
+///
+/// - `point_id` values may change if crash points are added or removed
+/// - Labels are not required to be unique
+///
+/// # Example
+///
+/// ```ignore
+/// .verify(|env, crash| {
+///     println!("Verifying after crash point {} ({})", crash.point_id, crash.label);
+/// })
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct CrashInfo {
-    /// The crash point ID (1-indexed).
+    /// The 1-indexed crash point ID.
+    ///
+    /// This is the order in which the crash point was encountered during
+    /// execution. The first crash point hit is `1`, the second is `2`, etc.
+    ///
+    /// Use this for:
+    /// - Logging and debugging
+    /// - Identifying which crash point triggered this run
+    ///
+    /// Reproducing a crash requires running the same test with the same
+    /// execution order and crash schedule.
     pub point_id: usize,
-    /// The label passed to `crash_point()`.
+
+    /// The label passed to `crash_point("label")`.
+    ///
+    /// This is the string provided when the crash point was defined.
+    /// Use descriptive labels to make crash reports meaningful.
+    ///
+    /// # Example labels
+    ///
+    /// - `"after_wal_write"`
+    /// - `"before_manifest_update"`
+    /// - `"committed"`
     pub label: String,
 }
 
