@@ -9,7 +9,9 @@ use crate::rt::{Phase, runtime};
 
 /// Builder for FIRST tests.
 ///
-/// Stores closures and routes execution based on the current phase.
+/// This type is an implementation detail. Users should interact with it
+/// through the builder methods returned by [`test()`].
+#[doc(hidden)]
 pub struct TestBuilder<R, V>
 where
     R: FnOnce(&Env),

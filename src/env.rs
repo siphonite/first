@@ -34,7 +34,9 @@ impl Env {
     }
 
     /// Returns the root of the isolated working directory.
-    pub fn root(&self) -> &PathBuf {
+    ///
+    /// This is internal-only. Users should use [`Env::path()`] instead.
+    pub(crate) fn root(&self) -> &PathBuf {
         &self.work_dir
     }
 }

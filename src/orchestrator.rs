@@ -19,7 +19,7 @@ const SIGKILL_EXIT_CODE: i32 = 137;
 ///
 /// Iterates through crash points, spawning execution and verification
 /// processes for each one.
-pub fn run<R, V>(_run_fn: Option<R>, _verify_fn: Option<V>)
+pub(crate) fn run<R, V>(_run_fn: Option<R>, _verify_fn: Option<V>)
 where
     R: FnOnce(&Env),
     V: FnOnce(&Env, &CrashInfo),
