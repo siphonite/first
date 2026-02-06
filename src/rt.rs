@@ -70,14 +70,20 @@ pub(crate) fn runtime() -> &'static RuntimeConfig {
     RUNTIME.get_or_init(init_runtime)
 }
 
-/// A potential crash location in the execution.
+/// Marks a potential crash location during test execution.
 ///
-/// When FIRST is active during the "Execution" phase, this function:
-/// 1. Increments the global crash counter.
-/// 2. If `counter == target`, terminates the process immediately via SIGKILL.
-/// 3. Otherwise, returns normally.
+/// Calling this function is always safe in all phases. Outside the
+/// Execution phase, it is a silent no-op and does not modify internal state.
 ///
-/// When FIRST is inactive (Orchestrator or Verify phase), this is a no-op.
+/// # Phase Behavior
+///
+/// | Phase        | Behavior                                         |
+/// |--------------|--------------------------------------------------|
+/// | Orchestrator | No-op (silently ignored)                         |
+/// | Execution    | Increments counter and may terminate the process |
+/// | Verify       | No-op (silently ignored)                         |
+///
+/// In non-Execution phases, the crash counter is not incremented.
 ///
 /// # Arguments
 ///
