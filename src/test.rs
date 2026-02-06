@@ -51,6 +51,17 @@ where
     /// Define the workload to execute.
     ///
     /// This closure runs during the EXECUTION phase.
+    ///
+    /// # Panics
+    ///
+    /// If the closure panics, the EXECUTION phase fails and the orchestrator
+    /// reports this as an error. Panics are not treated as crashes.
+    ///
+    /// # Completion Without Crash
+    ///
+    /// If the closure completes normally without hitting the target crash point,
+    /// the orchestrator interprets this as "schedule exhausted" — all crash
+    /// points have been explored and the test passes.
     pub fn run<R2>(self, f: R2) -> TestBuilder<R2, V>
     where
         R2: FnOnce(&Env),
@@ -64,6 +75,12 @@ where
     /// Define the verification logic.
     ///
     /// This closure runs during the VERIFY phase after a crash.
+    ///
+    /// # Panics
+    ///
+    /// If the closure panics (e.g., `assert!` or `panic!`), the VERIFY phase
+    /// fails and the test reports an invariant violation. This is the expected
+    /// way to signal that crash recovery failed.
     pub fn verify<V2>(self, f: V2) -> TestBuilder<R, V2>
     where
         V2: FnOnce(&Env, &CrashInfo),
@@ -79,6 +96,13 @@ where
     /// - Orchestrator: runs the supervisor loop
     /// - Execution: calls run closure
     /// - Verify: calls verify closure
+    ///
+    /// # Error Behavior
+    ///
+    /// | Phase       | Panic         | Normal Exit        | SIGKILL           |
+    /// |-------------|---------------|--------------------|-----------------  |
+    /// | Execution   | Test fails    | Schedule exhausted | Crash (expected)  |
+    /// | Verify      | Test fails    | Verification OK    | Test fails        |
     pub fn execute(self) {
         let config = runtime();
         let work_dir = std::env::var("FIRST_WORK_DIR")
