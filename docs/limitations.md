@@ -145,3 +145,43 @@ Crash points are serialized. Concurrent operations are not explored for race con
 ### Linux Only (v0.1)
 
 The current implementation uses Linux-specific APIs (`SIGKILL`, `/proc`). macOS and Windows support is not yet available.
+
+---
+
+## Integration Constraints (v0.1)
+
+### One `first::test()` Per `#[test]`
+
+| Pattern | Status |
+|---------|--------|
+| One `first::test()` per `#[test]` | ✅ Supported |
+| Multiple `first::test()` in one `#[test]` | ❌ Undefined |
+
+**Rationale**: The orchestrator manages process lifecycle. Nested or sequential calls conflict.
+
+### Async Tests Not Supported
+
+| Pattern | Status |
+|---------|--------|
+| `#[test]` (sync) | ✅ Supported |
+| `#[tokio::test]` | ❌ Not supported |
+| `#[async_std::test]` | ❌ Not supported |
+
+**Rationale**: FIRST uses `fork()` + `SIGKILL` — async runtimes don't survive this.
+
+### Not Thread-Safe
+
+| Pattern | Status |
+|---------|--------|
+| Single-threaded `.run()` closure | ✅ Supported |
+| `crash_point()` from spawned threads | ❌ Undefined |
+
+**Rationale**: Crash point counter uses atomic state but determinism requires single-threaded execution.
+
+### No Nested Workspaces
+
+| Pattern | Status |
+|---------|--------|
+| User-managed dirs inside `env.path()` | ✅ Supported |
+| Expecting FIRST to manage nested isolation | ❌ Not supported |
+

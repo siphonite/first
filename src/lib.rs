@@ -24,6 +24,15 @@
 //!         });
 //! }
 //! ```
+//!
+//! # Limitations (v0.1)
+//!
+//! - One `first::test()` per `#[test]` function
+//! - Async tests (`#[tokio::test]`) not supported
+//! - Not thread-safe (`crash_point()` from spawned threads is undefined)
+//! - No nested workspaces
+//!
+//! See `docs/limitations.md` for full details.
 
 mod env;
 mod orchestrator;
