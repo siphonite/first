@@ -6,11 +6,9 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
+use uuid::Uuid;
 
 use crate::env::{CrashInfo, Env};
-
-/// Base directory for FIRST test runs.
-use uuid::Uuid;
 
 /// Exit code for SIGKILL (128 + 9).
 const SIGKILL_EXIT_CODE: i32 = 137;
