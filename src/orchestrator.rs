@@ -4,13 +4,13 @@
 
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 
 use crate::env::{CrashInfo, Env};
 
 /// Base directory for FIRST test runs.
-const FIRST_BASE_DIR: &str = "/tmp/first";
+use uuid::Uuid;
 
 /// Exit code for SIGKILL (128 + 9).
 const SIGKILL_EXIT_CODE: i32 = 137;
@@ -42,8 +42,17 @@ where
 
     let mut target: usize = 1;
 
+    // Generate a unique base directory for this validation run.
+    // This ensures that parallel `cargo test` invocations don't collide.
+    let run_uuid = Uuid::new_v4();
+    let pid = std::process::id();
+    let base_dir = std::env::temp_dir()
+        .join("first")
+        .join(format!("first-{}-{}", pid, run_uuid));
+
     loop {
-        let work_dir = PathBuf::from(FIRST_BASE_DIR).join(format!("run_{}", target));
+        // The orchestrator owns the creation and cleanup of run_N directories.
+        let work_dir = base_dir.join(format!("run_{}", target));
 
         // Create fresh work directory
         if let Err(e) = fs::create_dir_all(&work_dir) {
@@ -52,13 +61,15 @@ where
         }
 
         // Spawn EXECUTION phase
-        let exec_result = spawn_child(&exe, &test_name, "EXECUTION", target, &work_dir);
+        // Note: We pass `base_dir` as FIRST_WORK_DIR, not `work_dir`.
+        // The child process will derive the leaf `run_N` path itself.
+        let exec_result = spawn_child(&exe, &test_name, "EXECUTION", target, &base_dir);
 
         match exec_result {
             ChildResult::Crashed(crash_info) => {
                 // Child crashed as expected, now verify
                 let verify_result =
-                    spawn_child_with_crash_info(&exe, &test_name, target, &work_dir, &crash_info);
+                    spawn_child_with_crash_info(&exe, &test_name, target, &base_dir, &crash_info);
 
                 match verify_result {
                     ChildResult::Success => {
@@ -72,6 +83,7 @@ where
                         print_failure_info(
                             target,
                             &work_dir,
+                            &base_dir, // Pass base_dir for reproduction command
                             &crash_info,
                             &test_name,
                             &format!("verification failed with exit code {}", code),
@@ -82,6 +94,7 @@ where
                         print_failure_info(
                             target,
                             &work_dir,
+                            &base_dir, // Pass base_dir for reproduction command
                             &crash_info,
                             &test_name,
                             "verify phase crashed unexpectedly",
@@ -108,7 +121,7 @@ where
                 eprintln!(
                     "  FIRST_PHASE=EXECUTION FIRST_CRASH_TARGET={} FIRST_WORK_DIR={} cargo test{} -- --exact",
                     target,
-                    work_dir.display(),
+                    base_dir.display(), // Use base_dir for reproduction
                     test_name
                         .as_ref()
                         .map(|n| format!(" {}", n))
@@ -125,7 +138,8 @@ where
 /// Print detailed failure information for debugging.
 fn print_failure_info(
     target: usize,
-    work_dir: &Path,
+    work_dir: &Path, // The leaf directory (for "see ...")
+    base_dir: &Path, // The base directory (for env var)
     crash_info: &CrashInfo,
     test_name: &Option<String>,
     reason: &str,
@@ -141,7 +155,7 @@ fn print_failure_info(
     eprintln!(
         "  FIRST_PHASE=VERIFY FIRST_CRASH_TARGET={} FIRST_WORK_DIR={} FIRST_CRASH_POINT_ID={} FIRST_CRASH_LABEL=\"{}\" cargo test{} -- --exact",
         target,
-        work_dir.display(),
+        base_dir.display(), // Use base_dir for reproduction
         crash_info.point_id,
         crash_info.label,
         test_name
@@ -344,5 +358,9 @@ fn extract_test_name() -> Option<String> {
         return Some(arg.clone());
     }
 
-    None
+    // Fallback: use thread name (standard in cargo test)
+    match std::thread::current().name() {
+        Some(name) if name != "main" => Some(name.to_string()),
+        _ => None,
+    }
 }
