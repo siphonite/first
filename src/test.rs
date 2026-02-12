@@ -105,7 +105,7 @@ where
     /// | Verify      | Test fails    | Verification OK    | Test fails        |
     pub fn execute(self) {
         let config = runtime();
-        let work_dir = std::env::var("FIRST_WORK_DIR")
+        let base_dir = std::env::var("FIRST_WORK_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("first").join("default"));
 
@@ -116,12 +116,26 @@ where
             }
             Phase::Execution => {
                 if let Some(run_fn) = self.run_fn {
+                    // Derive leaf directory from base + target
+                    let target = std::env::var("FIRST_CRASH_TARGET")
+                        .ok()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or(1);
+                    let work_dir = base_dir.join(format!("run_{}", target));
+
                     let env = Env::new(work_dir);
                     run_fn(&env);
                 }
             }
             Phase::Verify => {
                 if let Some(verify_fn) = self.verify_fn {
+                    // Derive leaf directory from base + target
+                    let target = std::env::var("FIRST_CRASH_TARGET")
+                        .ok()
+                        .and_then(|s| s.parse::<usize>().ok())
+                        .unwrap_or(1);
+                    let work_dir = base_dir.join(format!("run_{}", target));
+
                     let env = Env::new(work_dir);
                     // Parse crash info from env var
                     let crash_info = parse_crash_info();
