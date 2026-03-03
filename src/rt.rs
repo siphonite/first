@@ -3,8 +3,8 @@
 //! This module contains the core primitives for crash injection.
 
 use std::io::Write;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Global counter tracking the number of crash points encountered.
 /// Starts at 0, incremented to 1 on first crash_point, etc.
@@ -87,24 +87,25 @@ fn detect_multi_threaded_test() {
 
     // Check RUST_TEST_THREADS environment variable set by cargo test
     // 0 means unlimited (typically > 1), 1 means single-threaded (safe)
-    if let Ok(threads) = std::env::var(ENV_RUST_TEST_THREADS) {
-        if let Ok(thread_count) = threads.parse::<usize>() {
-            if thread_count == 0 || thread_count > 1 {
-                eprintln!(
-                    "ERROR: FIRST detected multi-threaded test execution (RUST_TEST_THREADS={})",
-                    thread_count
-                );
-                eprintln!();
-                eprintln!("FIRST uses SIGKILL to simulate power loss, which terminates the ENTIRE process.");
-                eprintln!("When multiple tests share the same process, one crash kills all tests.");
-                eprintln!();
-                eprintln!("SOLUTION: Run tests with --test-threads=1:");
-                eprintln!("  cargo test -- --test-threads=1");
-                eprintln!();
-                eprintln!("Or set FIRST_SKIP_THREAD_CHECK=1 at your own risk.");
-                std::process::exit(1);
-            }
-        }
+    if let Ok(threads) = std::env::var(ENV_RUST_TEST_THREADS)
+        && let Ok(thread_count) = threads.parse::<usize>()
+        && (thread_count == 0 || thread_count > 1)
+    {
+        eprintln!(
+            "ERROR: FIRST detected multi-threaded test execution (RUST_TEST_THREADS={})",
+            thread_count
+        );
+        eprintln!();
+        eprintln!(
+            "FIRST uses SIGKILL to simulate power loss, which terminates the ENTIRE process."
+        );
+        eprintln!("When multiple tests share the same process, one crash kills all tests.");
+        eprintln!();
+        eprintln!("SOLUTION: Run tests with --test-threads=1:");
+        eprintln!("  cargo test -- --test-threads=1");
+        eprintln!();
+        eprintln!("Or set FIRST_SKIP_THREAD_CHECK=1 at your own risk.");
+        std::process::exit(1);
     }
 
     // Check command-line arguments for --test-threads=N where N > 1
