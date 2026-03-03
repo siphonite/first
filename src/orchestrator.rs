@@ -209,7 +209,10 @@ fn spawn_child(
 
     // Read stderr for crash metadata
     let stderr = child.stderr.take();
-    let crash_info = stderr.and_then(parse_crash_metadata);
+    let (crash_info, stderr_output) = match stderr {
+        Some(s) => parse_crash_metadata_with_output(s),
+        None => (None, String::new()),
+    };
 
     // Wait for child to exit
     let status = match child.wait() {
@@ -219,6 +222,11 @@ fn spawn_child(
             return ChildResult::Failed(1);
         }
     };
+
+    // If child failed, print stderr output for debugging
+    if !status.success() && !stderr_output.is_empty() {
+        eprintln!("[first] child stderr: {}", stderr_output);
+    }
 
     interpret_exit_status(status, crash_info)
 }
@@ -272,18 +280,31 @@ fn spawn_child_with_crash_info(
 }
 
 /// Parse crash metadata from child's stderr.
-fn parse_crash_metadata(stderr: impl std::io::Read) -> Option<CrashInfo> {
-    let reader = BufReader::new(stderr);
-    for line in reader.lines().map_while(Result::ok) {
-        // Look for JSON crash metadata
-        if line.starts_with(r#"{"event":"crash""#) {
-            // Simple JSON parsing (avoid adding serde dependency for now)
-            if let Some(info) = parse_crash_json(&line) {
-                return Some(info);
+fn parse_crash_metadata_with_output(stderr: impl std::io::Read) -> (Option<CrashInfo>, String) {
+    let mut reader = BufReader::new(stderr);
+    let mut crash_info = None;
+    let mut full_output = String::new();
+
+    loop {
+        let mut line = String::new();
+        match reader.read_line(&mut line) {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+                let trimmed = line.trim();
+                full_output.push_str(trimmed);
+                full_output.push('\n');
+                // Look for JSON crash metadata
+                if trimmed.starts_with(r#"{"event":"crash""#)
+                    && let Some(info) = parse_crash_json(trimmed)
+                {
+                    crash_info = Some(info);
+                }
             }
+            Err(_) => break,
         }
     }
-    None
+
+    (crash_info, full_output)
 }
 
 /// Simple JSON parser for crash metadata.
