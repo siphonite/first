@@ -18,6 +18,10 @@ const ENV_PHASE: &str = "FIRST_PHASE";
 const ENV_CRASH_TARGET: &str = "FIRST_CRASH_TARGET";
 const ENV_WORK_DIR: &str = "FIRST_WORK_DIR";
 const ENV_SEED: &str = "FIRST_SEED";
+const ENV_SKIP_THREAD_CHECK: &str = "FIRST_SKIP_THREAD_CHECK";
+
+/// Environment variable set by cargo test (0 = unlimited, N = thread count)
+const ENV_RUST_TEST_THREADS: &str = "RUST_TEST_THREADS";
 
 /// Execution phase of the current process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,9 +61,90 @@ fn init_runtime() -> RuntimeConfig {
         usize::MAX
     };
 
+    if phase == Phase::Execution {
+        detect_multi_threaded_test();
+    }
+
     RuntimeConfig {
         phase,
         target_crash_point,
+    }
+}
+
+/// Detect and fail fast if running in a multi-threaded test environment.
+///
+/// FIRST uses SIGKILL to simulate power loss, which terminates the entire process.
+/// When multiple tests share the same process (the default in cargo test with
+/// multiple threads), one test hitting a crash point kills all other tests.
+///
+/// This function checks for multi-threaded test execution and terminates
+/// with a clear error message if detected.
+fn detect_multi_threaded_test() {
+    // Allow bypassing this check via environment variable for advanced use cases
+    if std::env::var(ENV_SKIP_THREAD_CHECK).is_ok() {
+        return;
+    }
+
+    // Check RUST_TEST_THREADS environment variable set by cargo test
+    // 0 means unlimited (typically > 1), 1 means single-threaded (safe)
+    if let Ok(threads) = std::env::var(ENV_RUST_TEST_THREADS)
+        && let Ok(thread_count) = threads.parse::<usize>()
+        && (thread_count == 0 || thread_count > 1)
+    {
+        eprintln!(
+            "ERROR: FIRST detected multi-threaded test execution (RUST_TEST_THREADS={})",
+            thread_count
+        );
+        eprintln!();
+        eprintln!(
+            "FIRST uses SIGKILL to simulate power loss, which terminates the ENTIRE process."
+        );
+        eprintln!("When multiple tests share the same process, one crash kills all tests.");
+        eprintln!();
+        eprintln!("SOLUTION: Run tests with --test-threads=1:");
+        eprintln!("  cargo test -- --test-threads=1");
+        eprintln!();
+        eprintln!("Or set FIRST_SKIP_THREAD_CHECK=1 at your own risk.");
+        std::process::exit(1);
+    }
+
+    // Check command-line arguments for --test-threads=N where N > 1
+    let args: Vec<String> = std::env::args().collect();
+    let mut thread_arg_found = false;
+    let mut is_single_threaded = false;
+
+    for i in 0..args.len() {
+        if args[i] == "--test-threads" && i + 1 < args.len() {
+            thread_arg_found = true;
+            if let Ok(count) = args[i + 1].parse::<usize>() {
+                is_single_threaded = count <= 1;
+            }
+            break;
+        }
+        if args[i].starts_with("--test-threads=") {
+            thread_arg_found = true;
+            let value = args[i].trim_start_matches("--test-threads=");
+            if let Ok(count) = value.parse::<usize>() {
+                is_single_threaded = count <= 1;
+            }
+            break;
+        }
+    }
+
+    // If --test-threads was specified with a value > 1, fail fast
+    if thread_arg_found && !is_single_threaded {
+        eprintln!("ERROR: FIRST detected --test-threads > 1");
+        eprintln!();
+        eprintln!(
+            "FIRST uses SIGKILL to simulate power loss, which terminates the ENTIRE process."
+        );
+        eprintln!("When multiple tests share the same process, one crash kills all tests.");
+        eprintln!();
+        eprintln!("SOLUTION: Run tests with --test-threads=1:");
+        eprintln!("  cargo test -- --test-threads=1");
+        eprintln!();
+        eprintln!("Or set FIRST_SKIP_THREAD_CHECK=1 at your own risk.");
+        std::process::exit(1);
     }
 }
 
